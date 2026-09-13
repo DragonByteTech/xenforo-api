@@ -1,8 +1,8 @@
 CHANGELOG
 =========
 
-Unreleased
-----------
+1.2.1 (2026-09-13)
+------------------
 
 * A 4xx is logged at `info`, not `error`: XenForo answered, and the typed exception
   carries the answer. `error` is for a forum that did not - a transport failure, a 5xx,
