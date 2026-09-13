@@ -19,6 +19,7 @@ use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\StreamFactoryInterface;
 use Psr\Log\LoggerInterface;
+use Psr\Log\LogLevel;
 use Psr\Log\NullLogger;
 
 /**
@@ -302,7 +303,7 @@ final class Connection
             // which is precisely the failure this package exists to keep visible.
             $this->logger->error('XenForo API answered success with a body that is not JSON', [
                 'method' => $request->getMethod(),
-                'uri' => (string) $request->getUri(),
+                'uri' => self::loggable($request),
                 'status' => $status,
                 'content_type' => $response->getHeaderLine('Content-Type'),
             ]);
@@ -315,12 +316,7 @@ final class Connection
             );
         }
 
-        $this->logger->error('XenForo API error response', [
-            'method' => $request->getMethod(),
-            'uri' => (string) $request->getUri(),
-            'status' => $status,
-            'body' => $decoded ?? $body,
-        ]);
+        $this->logErrorResponse($request, $status, $decoded ?? $body);
 
         throw ApiException::fromResponse(
             $request->getMethod(),
@@ -367,12 +363,7 @@ final class Connection
         $body = (string) $response->getBody();
         $decoded = self::decode($body);
 
-        $this->logger->error('XenForo API error response', [
-            'method' => $request->getMethod(),
-            'uri' => (string) $request->getUri(),
-            'status' => $status,
-            'body' => $decoded ?? $body,
-        ]);
+        $this->logErrorResponse($request, $status, $decoded ?? $body);
 
         throw ApiException::fromResponse(
             $request->getMethod(),
@@ -401,19 +392,50 @@ final class Connection
         $method = $request->getMethod();
         $uri = (string) $request->getUri();
 
-        $this->logger->debug('XenForo API request', ['method' => $method, 'uri' => $uri]);
+        $this->logger->debug('XenForo API request', ['method' => $method, 'uri' => self::loggable($request)]);
 
         try {
             return $this->client->sendRequest($request);
         } catch (ClientExceptionInterface $e) {
             $this->logger->error('XenForo API request failed', [
                 'method' => $method,
-                'uri' => $uri,
+                'uri' => self::loggable($request),
                 'error' => $e->getMessage(),
             ]);
 
             throw RequestException::for($method, $uri, $e);
         }
+    }
+
+    /**
+     * The level follows what the status means, not whether it is 2xx. `error` is for a
+     * forum that did not answer - a transport failure, a 5xx, a 2xx that is not JSON.
+     * A 4xx is XenForo answering, deliberately, and the typed exception thrown next is
+     * how the caller finds out; a consumer that alerts on `error` must not be woken for
+     * a 404 that means "not a member", which only that consumer can tell from "wrong
+     * URL". So a 4xx is `info`: on the record, not on the pager.
+     *
+     * @param  mixed  $body  decoded when it was JSON, raw when it was not
+     */
+    private function logErrorResponse(RequestInterface $request, int $status, mixed $body): void
+    {
+        $this->logger->log($status >= 500 ? LogLevel::ERROR : LogLevel::INFO, 'XenForo API error response', [
+            'method' => $request->getMethod(),
+            'uri' => self::loggable($request),
+            'status' => $status,
+            'body' => $body,
+        ]);
+    }
+
+    /**
+     * The URI as it is logged: without the query string. On a lookup endpoint the query
+     * IS the lookup - an email address, a username - and the path alone names the call.
+     * The exception a failure raises still carries the whole URI; what a consumer logs
+     * from that is the consumer's decision.
+     */
+    private static function loggable(RequestInterface $request): string
+    {
+        return (string) $request->getUri()->withQuery('');
     }
 
     /**

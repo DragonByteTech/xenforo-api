@@ -1,6 +1,15 @@
 CHANGELOG
 =========
 
+Unreleased
+----------
+
+* A 4xx is logged at `info`, not `error`: XenForo answered, and the typed exception
+  carries the answer. `error` is for a forum that did not - a transport failure, a 5xx,
+  a 2xx that is not JSON
+* The query string is left out of every logged URI, since on a lookup endpoint it is
+  the lookup
+
 1.2.0 (2026-09-13)
 ------------------
 

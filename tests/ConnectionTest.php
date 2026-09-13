@@ -328,6 +328,52 @@ final class ConnectionTest extends TestCase
         $this->assertTrue($logger->hasMessageContaining('behind the forum'));
     }
 
+    public function test_a_4xx_is_logged_as_information_and_a_5xx_as_an_error(): void
+    {
+        $logger = new RecordingLogger();
+        $connection = $this->connection(logger: $logger);
+
+        $this->client->pushError(404, [['code' => 'requested_page_not_found', 'message' => 'Not found']]);
+
+        try {
+            $connection->get('users/999999/');
+        } catch (NotFoundException) {
+        }
+
+        $this->assertCount(0, $logger->withLevel('error'));
+        $this->assertSame(404, $logger->withLevel('info')[0]['context']['status']);
+
+        $this->client->pushError(500, [['code' => 'server_error', 'message' => 'Oops']]);
+
+        try {
+            $connection->get('users/1/');
+        } catch (ServerException) {
+        }
+
+        $this->assertSame(500, $logger->withLevel('error')[0]['context']['status']);
+    }
+
+    public function test_the_query_string_stays_out_of_the_log(): void
+    {
+        $logger = new RecordingLogger();
+
+        $this->client->pushError(404, [['code' => 'requested_page_not_found', 'message' => 'Not found']]);
+
+        try {
+            $this->connection(logger: $logger)->get('users/find-email', ['email' => 'someone@example.com']);
+        } catch (NotFoundException) {
+        }
+
+        $this->assertStringContainsString('email=someone', $this->sentUri());
+
+        foreach ($logger->records as $record) {
+            $this->assertStringNotContainsString('someone', json_encode($record['context'], JSON_THROW_ON_ERROR));
+            $this->assertSame('https://forum.example.com/api/users/find-email', $record['context']['uri']);
+        }
+
+        $this->assertCount(2, $logger->records);
+    }
+
     public function test_a_transport_failure_is_not_an_api_error(): void
     {
         $this->client->push(new TransportFailure('Connection refused'));

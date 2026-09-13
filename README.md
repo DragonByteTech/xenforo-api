@@ -500,9 +500,16 @@ nothing is ever lost for not being in a specification.
 
 ## Logging
 
-Every constructor takes an optional PSR-3 logger. Requests are logged at `debug`, failures
-at `error`, and a forum that has outgrown the pinned API version at `info`. Credentials are
-never logged — `Authentication::describe()` names the credential type and nothing more.
+Every constructor takes an optional PSR-3 logger. Requests are logged at `debug`, and a
+forum that has outgrown the pinned API version at `info`. A failure's level follows what
+it means: `error` when the forum did not answer — a transport failure, a 5xx, a 2xx whose
+body is not JSON — and `info` for a 4xx, because that is XenForo answering and the typed
+exception thrown next is where the caller decides whether a 404 is a missing member or a
+wrong URL. A consumer that alerts on `error` is not woken for the first.
+
+The query string is left out of every logged URI, since on a lookup endpoint it is the
+lookup — an email address, a username. Credentials are never logged —
+`Authentication::describe()` names the credential type and nothing more.
 
 ## Testing
 
