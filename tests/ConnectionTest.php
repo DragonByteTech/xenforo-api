@@ -342,6 +342,8 @@ final class ConnectionTest extends TestCase
 
         $this->assertCount(0, $logger->withLevel('error'));
         $this->assertSame(404, $logger->withLevel('info')[0]['context']['status']);
+        $this->assertSame(['requested_page_not_found'], $logger->withLevel('info')[0]['context']['errors']);
+        $this->assertArrayNotHasKey('body', $logger->withLevel('info')[0]['context']);
 
         $this->client->pushError(500, [['code' => 'server_error', 'message' => 'Oops']]);
 
@@ -351,6 +353,47 @@ final class ConnectionTest extends TestCase
         }
 
         $this->assertSame(500, $logger->withLevel('error')[0]['context']['status']);
+    }
+
+    /**
+     * XenForo's error messages echo the caller's input back, and a body that did not
+     * decode is somebody else's whole page. Neither belongs in a log: the codes do.
+     */
+    public function test_an_error_body_is_never_logged(): void
+    {
+        $logger = new RecordingLogger();
+        $connection = $this->connection(logger: $logger);
+
+        $this->client->pushError(400, [['code' => 'requested_user_x_not_found', 'message' => "The requested user 'someone-private' could not be found."]]);
+
+        try {
+            $connection->post('auth/', ['login' => 'someone-private', 'password' => 'x']);
+        } catch (ClientException) {
+        }
+
+        $this->client->pushRaw(502, '<html><body>Bad gateway for someone-private</body></html>', ['Content-Type' => 'text/html']);
+
+        try {
+            $connection->get('index/');
+        } catch (ServerException) {
+        }
+
+        // Two debug request lines and the two error responses - and none of the four
+        // carries the input the forum echoed back.
+        $this->assertCount(4, $logger->records);
+
+        foreach ($logger->records as $record) {
+            $this->assertStringNotContainsString('someone-private', json_encode($record['context'], JSON_THROW_ON_ERROR));
+        }
+
+        $rejected = $logger->withLevel('info')[0]['context'];
+        $this->assertSame(['requested_user_x_not_found'], $rejected['errors']);
+        $this->assertArrayNotHasKey('body', $rejected);
+
+        $gateway = $logger->withLevel('error')[0]['context'];
+        $this->assertSame([], $gateway['errors']);
+        $this->assertSame('text/html', $gateway['content_type']);
+        $this->assertSame(57, $gateway['body_bytes']);
     }
 
     public function test_the_query_string_stays_out_of_the_log(): void

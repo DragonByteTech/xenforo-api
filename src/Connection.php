@@ -316,15 +316,17 @@ final class Connection
             );
         }
 
-        $this->logErrorResponse($request, $status, $decoded ?? $body);
-
-        throw ApiException::fromResponse(
+        $exception = ApiException::fromResponse(
             $request->getMethod(),
             (string) $request->getUri(),
             $response,
             $decoded,
             $body
         );
+
+        $this->logErrorResponse($request, $response, $exception);
+
+        throw $exception;
     }
 
     /**
@@ -363,15 +365,17 @@ final class Connection
         $body = (string) $response->getBody();
         $decoded = self::decode($body);
 
-        $this->logErrorResponse($request, $status, $decoded ?? $body);
-
-        throw ApiException::fromResponse(
+        $exception = ApiException::fromResponse(
             $request->getMethod(),
             (string) $request->getUri(),
             $response,
             $decoded,
             $body
         );
+
+        $this->logErrorResponse($request, $response, $exception);
+
+        throw $exception;
     }
 
     /**
@@ -415,16 +419,30 @@ final class Connection
      * a 404 that means "not a member", which only that consumer can tell from "wrong
      * URL". So a 4xx is `info`: on the record, not on the pager.
      *
-     * @param  mixed  $body  decoded when it was JSON, raw when it was not
+     * What is logged is the error CODES, never the body. XenForo's error messages echo
+     * the caller's input back - "The requested user 'x' could not be found" names the
+     * username or address the client was asked about - and a body that did not decode is
+     * somebody else's whole page. The codes are what a reader groups and alerts on; the
+     * exception thrown next carries the messages for the caller. Where there were no
+     * codes, the body's size and content type say what kind of answer it was.
      */
-    private function logErrorResponse(RequestInterface $request, int $status, mixed $body): void
+    private function logErrorResponse(RequestInterface $request, ResponseInterface $response, ApiException $exception): void
     {
-        $this->logger->log($status >= 500 ? LogLevel::ERROR : LogLevel::INFO, 'XenForo API error response', [
+        $status = $response->getStatusCode();
+
+        $context = [
             'method' => $request->getMethod(),
             'uri' => self::loggable($request),
             'status' => $status,
-            'body' => $body,
-        ]);
+            'errors' => $exception->codes(),
+        ];
+
+        if ($exception->codes() === []) {
+            $context['content_type'] = $response->getHeaderLine('Content-Type');
+            $context['body_bytes'] = strlen($exception->body);
+        }
+
+        $this->logger->log($status >= 500 ? LogLevel::ERROR : LogLevel::INFO, 'XenForo API error response', $context);
     }
 
     /**

@@ -508,8 +508,9 @@ exception thrown next is where the caller decides whether a 404 is a missing mem
 wrong URL. A consumer that alerts on `error` is not woken for the first.
 
 The query string is left out of every logged URI, since on a lookup endpoint it is the
-lookup — an email address, a username. Credentials are never logged —
-`Authentication::describe()` names the credential type and nothing more.
+lookup — an email address, a username — and an error response is logged by its error
+codes, never its body, since XenForo's messages echo the caller's input back. Credentials
+are never logged — `Authentication::describe()` names the credential type and nothing more.
 
 ## Testing
 
