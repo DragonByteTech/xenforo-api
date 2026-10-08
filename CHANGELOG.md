@@ -1,8 +1,8 @@
 CHANGELOG
 =========
 
-Unreleased
-----------
+1.2.2 (2026-10-08)
+------------------
 
 * `SiteInfo` reads the scopes a key holds. XenForo sends `key.scopes` as a map of scope
   to `true`, not the list its documentation describes, so `$scopes` was always empty and
