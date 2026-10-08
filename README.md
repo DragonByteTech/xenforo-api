@@ -109,7 +109,7 @@ feature/unfeature pair. `$xf->index()->get()->version()` is the way to find out 
 you are talking to before relying on any of this.
 
 What no client can cover is what an add-on adds — see
-[Extending it](#extending-it-for-add-on-endpoints).
+[Add-on endpoints](#add-on-endpoints).
 
 ## Authenticating
 
@@ -302,9 +302,9 @@ rather than guess. **`$xf->attachments()->get($id)->thumbnail_url` is
 the same answer** out of a request you have probably already made, and it does not depend on
 how the client is configured; prefer it.
 
-## The bundled add-ons: Media Gallery and Resource Manager
+## Media Gallery and Resource Manager
 
-XFMG and XFRM are add-ons, not core, and a forum may have neither. Their endpoints are
+**XFMG and XFRM are bundled add-ons, not core, and a forum may have neither.** Their endpoints are
 wrapped here as a convenience — this is the same extension mechanism described below, and
 these classes are what a third party's own `Endpoint` would look like.
 
@@ -378,9 +378,10 @@ empty answer every one of them would reach you as "no such record". It is an
 wrong — a missing required input, a validation failure, a page past the end — so the status
 distinguishes very little and `$e->hasCode(…)` distinguishes exactly.
 
-## Extending it, for add-on endpoints
+## Add-on endpoints
 
-A XenForo forum's API is whatever its add-ons say it is. An add-on that extends
+**A XenForo forum's API is whatever its add-ons say it is**, so this package cannot be the
+whole of it. An add-on that extends
 `\XF\Api\Controller\UsersController` with an `actionGetFindCriteria()` adds
 `GET users/find-criteria` to that forum and to no other, and no client can anticipate it. So
 the extension point is a class, not a registration.
@@ -472,7 +473,10 @@ the forum has installed. An add-on can add fields to any entity by extending its
 `toApiResult()`, so each entity also keeps the array it was built from in `->raw` and
 nothing is ever lost for not being in a specification.
 
-## Things about this API worth knowing before you meet them
+## Things worth knowing
+
+Facts about XenForo's API that are easier to read here than to discover against a forum,
+each verified against a real one.
 
 - **The API is GET, POST and DELETE.** There are no PUT or PATCH endpoints, and no non-POST
   endpoint takes a body — DELETE takes query parameters. Every write is a POST, including
