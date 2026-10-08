@@ -10,7 +10,7 @@ use PHPUnit\Framework\TestCase as BaseTestCase;
 final class SiteInfoTest extends BaseTestCase
 {
     /**
-     * @return array<mixed>
+     * @return array{version_id: int, site_title: string, base_url: string, api_url: string, key: array{type: string, user_id: int, allow_all_scopes: bool, scopes: array<mixed>}}
      */
     private function response(): array
     {
@@ -23,7 +23,9 @@ final class SiteInfoTest extends BaseTestCase
                 'type' => 'user',
                 'user_id' => 4264,
                 'allow_all_scopes' => false,
-                'scopes' => ['user:read', 'thread:read'],
+                // As a real forum sends it: a map of scope to true, not the list the
+                // documentation describes. Captured from 2.3.12 with a scoped user key.
+                'scopes' => ['user:read' => true, 'thread:read' => true],
             ],
         ];
     }
@@ -51,7 +53,36 @@ final class SiteInfoTest extends BaseTestCase
     {
         $info = SiteInfo::fromArray($this->response());
 
+        $this->assertSame(['user:read', 'thread:read'], $info->scopes);
         $this->assertTrue($info->hasScope('user:read'));
+        $this->assertFalse($info->hasScope('user:write'));
+    }
+
+    /**
+     * The documentation promises a list of strings, and the specification generated from
+     * it says the same. No XenForo line sends one, but the shape it promises is read too,
+     * so a forum that one day keeps the promise still answers correctly.
+     */
+    public function test_the_documented_list_of_scopes_is_read_as_well(): void
+    {
+        $response = $this->response();
+        $response['key']['scopes'] = ['user:read', 'thread:read'];
+
+        $this->assertSame(['user:read', 'thread:read'], SiteInfo::fromArray($response)->scopes);
+    }
+
+    /**
+     * A scope mapped to false is not granted; and a user key with no scopes answers an
+     * empty JSON array rather than an empty object, which decodes to [] either way.
+     */
+    public function test_a_scope_mapped_to_false_is_not_held(): void
+    {
+        $response = $this->response();
+        $response['key']['scopes'] = ['user:read' => true, 'user:write' => false];
+
+        $info = SiteInfo::fromArray($response);
+
+        $this->assertSame(['user:read'], $info->scopes);
         $this->assertFalse($info->hasScope('user:write'));
     }
 

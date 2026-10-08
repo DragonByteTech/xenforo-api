@@ -41,10 +41,18 @@ final class SiteInfo implements \JsonSerializable
     {
         $key = Cast::array($data['key'] ?? null);
 
+        // XenForo documents key[scopes] as a list of strings and sends a map of scope to
+        // true: IndexController returns the ApiKey entity's own column, which
+        // verifyScopes() normalises to {scope: true} on every line from 2.1 - a list is
+        // what the @api-out annotation promises, and what the specification generated
+        // from it describes. Both shapes are read, so a forum that one day sends the
+        // documented list is still right. An empty map arrives as [].
         $scopes = [];
-        foreach (Cast::array($key['scopes'] ?? null) as $scope) {
-            if (is_string($scope)) {
-                $scopes[] = $scope;
+        foreach (Cast::array($key['scopes'] ?? null) as $name => $granted) {
+            if (is_string($name) && $granted) {
+                $scopes[] = $name;
+            } elseif (is_int($name) && is_string($granted)) {
+                $scopes[] = $granted;
             }
         }
 

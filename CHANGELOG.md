@@ -1,6 +1,13 @@
 CHANGELOG
 =========
 
+Unreleased
+----------
+
+* `SiteInfo` reads the scopes a key holds. XenForo sends `key.scopes` as a map of scope
+  to `true`, not the list its documentation describes, so `$scopes` was always empty and
+  `hasScope()` false for every key that is not allowed all scopes. Both shapes are read
+
 1.2.1 (2026-09-13)
 ------------------
 
